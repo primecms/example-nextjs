@@ -3,6 +3,7 @@ import gql from 'graphql-tag'
 import Link from 'next/link'
 import { Query } from 'react-apollo'
 import { format } from 'date-fns'
+import { isPreviewing, clearPreview } from 'apollo-link-prime';
 
 export const query = gql`
   query {
@@ -21,7 +22,6 @@ export const query = gql`
   }
 `
 
-
 const BlogPost = ({ node }) => {
   return (
     <div key={node.id}>
@@ -33,40 +33,18 @@ const BlogPost = ({ node }) => {
 
 
 export default class Index extends React.Component {
-  componentDidMount() {
-    if (typeof window !== 'undefined') {
-      const query = window.location.search
-        .substr(1)
-        .split('&')
-        .reduce((acc, item) => {
-          const [key, value] = item.split('=').map(decodeURIComponent);
-          acc[key] = value;
-          return acc;
-        }, {});
-      const endpoint = 'https://example-prime.herokuapp.com';
-      if (query['prime.id']) {
-        const url = `${endpoint}/prime/preview?id=${query['prime.id']}`;
-        fetch(url, { credentials: 'include' }).then(r => r.json())
-        .then(res => {
-          document.cookie = 'prime.accessToken=' + res.accessToken;
-          document.cookie = 'prime.preview=' + res.document.id;
-          window.location = '/';
-        })
-      }
-    }
-  }
-  
   render () {
     return (
       <div>
         <h1>Blog posts</h1>
-        <Query query={query}>
+        <Query query={query} fetchPolicy="network-only">
           {({ loading, error, data }) => {
             if (error) return <div>error</div>;
             if (loading) return <div>Loading</div>;
             return data.allBlog.edges.map(BlogPost);
           }}
         </Query>
+        {isPreviewing() && <button onClick={clearPreview}>Clear preview</button>}
       </div>
     )
   }

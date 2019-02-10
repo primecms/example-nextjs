@@ -1,45 +1,73 @@
 import React from 'react'
-import cookie from 'cookie'
-import { ApolloConsumer } from 'react-apollo'
+import gql from 'graphql-tag'
+import Link from 'next/link'
+import { Query } from 'react-apollo'
+import { format } from 'date-fns'
 
-import redirect from '../lib/redirect'
-import checkLoggedIn from '../lib/checkLoggedIn'
+export const query = gql`
+  query {
+    allBlog {
+      edges {
+        node {
+          _meta {
+            updatedAt
+          }
+          id
+          title
+          body
+        }
+      }
+    }
+  }
+`
+
+
+const BlogPost = ({ node }) => {
+  return (
+    <div key={node.id}>
+      <time dateTime={node._meta.updatedAt}>{format(node._meta.updatedAt, 'MM/DD/YYYY')}</time>
+      <h3><Link as={`/blog/${node.id}`} href={`/blog?id=${node.id}`}><a>{node.title}</a></Link></h3>
+    </div>
+  );
+}
+
 
 export default class Index extends React.Component {
-  static async getInitialProps (context, apolloClient) {
-    const { loggedInUser } = await checkLoggedIn(context.apolloClient)
-
-    if (!loggedInUser.user) {
-      // If not signed in, send them somewhere more useful
-      redirect(context, '/signin')
+  componentDidMount() {
+    if (typeof window !== 'undefined') {
+      const query = window.location.search
+        .substr(1)
+        .split('&')
+        .reduce((acc, item) => {
+          const [key, value] = item.split('=').map(decodeURIComponent);
+          acc[key] = value;
+          return acc;
+        }, {});
+      const endpoint = 'https://example-prime.herokuapp.com';
+      if (query['prime.id']) {
+        const url = `${endpoint}/prime/preview?id=${query['prime.id']}`;
+        fetch(url, { credentials: 'include' }).then(r => r.json())
+        .then(res => {
+          document.cookie = 'prime.accessToken=' + res.accessToken;
+          document.cookie = 'prime.preview=' + res.document.id;
+          window.location = '/';
+        })
+      }
     }
-
-    return { loggedInUser }
   }
-
-  signout = apolloClient => () => {
-    document.cookie = cookie.serialize('token', '', {
-      maxAge: -1 // Expire the cookie immediately
-    })
-
-    // Force a reload of all the current queries now that the user is
-    // logged in, so we don't accidentally leave any state around.
-    apolloClient.cache.reset().then(() => {
-      // Redirect to a more useful page when signed out
-      redirect({}, '/signin')
-    })
-  }
-
+  
   render () {
     return (
-      <ApolloConsumer>
-        {client => (
-          <div>
-            Hello {this.props.loggedInUser.user.name}!<br />
-            <button onClick={this.signout(client)}>Sign out</button>
-          </div>
-        )}
-      </ApolloConsumer>
+      <div>
+        <h1>Blog posts</h1>
+        <Query query={query}>
+          {({ loading, error, data }) => {
+            if (error) return <div>error</div>;
+            if (loading) return <div>Loading</div>;
+            return data.allBlog.edges.map(BlogPost);
+          }}
+        </Query>
+      </div>
     )
   }
 }

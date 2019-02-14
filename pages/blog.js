@@ -22,8 +22,8 @@ export const query = gql`
 const Blog = withRouter((props) => (
   <Query query={query} variables={{ id: props.router.query.id }}>
     {({ loading, error, data: { Blog } }) => {
-      if (error) return <div>error</div>;
       if (loading) return <div>Loading</div>;
+      if (error || !Blog) return <div>error</div>;
       return (
         <div>
           <time dateTime={Blog._meta.updatedAt}>{format(Blog._meta.updatedAt, 'MM/DD/YYYY')}</time>
